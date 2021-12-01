@@ -60,7 +60,7 @@ public class Day01
         return count;
     }
 
-    private IEnumerable<int> MakeSlidingWindows(int windowLength, IEnumerable<int> values)
+    private IEnumerable<int> MakeSlidingWindows_Orig(int windowLength, IEnumerable<int> values)
     {
         var window = new List<int>();
 
@@ -73,6 +73,23 @@ public class Day01
 
             window.Add(depth);
             if (window.Count == windowLength)
+            {
+                yield return window.Sum();
+            }
+        }
+    }
+
+    // A second, "fancier" impl. using a fixed size array. Sacrifices readability for cleverness? 🤔
+    private IEnumerable<int> MakeSlidingWindows(int windowLength, IEnumerable<int> values)
+    {
+        var window = new int[windowLength];
+        var i = 0;
+        var iterationCount = 0;
+
+        foreach (var depth in values)
+        {
+            window[i = (i + 1) % windowLength] = depth;
+            if ((iterationCount += 1) >= windowLength)
             {
                 yield return window.Sum();
             }
