@@ -1,34 +1,28 @@
 namespace AoC;
 
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using Xunit;
-using Xunit.Abstractions;
 
 public class Day01
 {
-    private readonly ITestOutputHelper _output;
-
-    public Day01(ITestOutputHelper output) => _output = output;
-
-    [InlineData("day01_example.txt")]
-    [InlineData("day01.txt")]
+    [InlineData("day01_example.txt", 7)]
+    [InlineData("day01.txt", 1832)]
     [Theory]
-    public async Task Part1(string filename)
+    public async Task Part1(string filename, int expectation)
     {
         var depths = await LoadDepthsAsync(filename);
 
         var count = CountOfValueGreaterThanPrevious(depths);
 
-        _output.WriteLine($"{count}");
+        Assert.Equal(count, expectation);
     }
 
-    [InlineData("day01_example.txt")]
-    [InlineData("day01.txt")]
+    [InlineData("day01_example.txt", 5)]
+    [InlineData("day01.txt", 1858)]
     [Theory]
-    public async Task Part2(string filename)
+    public async Task Part2(string filename, int expectation)
     {
         var depths = await LoadDepthsAsync(filename);
 
@@ -36,10 +30,10 @@ public class Day01
 
         var count = CountOfValueGreaterThanPrevious(windows);
 
-        _output.WriteLine($"{count}");
+        Assert.Equal(count, expectation);
     }
 
-    private static async Task<IEnumerable<int>> LoadDepthsAsync(string filename) => (await File.ReadAllLinesAsync(Path.Combine("input", filename))).Select(int.Parse);
+    private static async Task<IEnumerable<int>> LoadDepthsAsync(string filename) => (await Input.ReadAllLinesAsync(filename)).Select(int.Parse);
 
     private static int CountOfValueGreaterThanPrevious(IEnumerable<int> depths)
     {
