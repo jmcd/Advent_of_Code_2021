@@ -1,42 +1,39 @@
 namespace AoC;
 
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Xunit;
 
 public class Day02
 {
+    private static async Task<IEnumerable<(string command, int magnitude)>> ReadInput(string filename) =>
+        (await Input.ReadAllLinesAsync(filename)).Select(line =>
+        {
+            var comps = line.Split(" ");
+            return (comps[0], int.Parse(comps[1]));
+        });
+
     [Theory]
     [InlineData("day02_example.txt", 150)]
     [InlineData("day02.txt", 1692075)]
     public async Task Part1(string filename, int expectation)
     {
-        var deltas = (await Input.ReadAllLinesAsync(filename)).Select(ParseCommandDelta);
-
-        var position = (x: 0, y: 0);
-        foreach (var delta in deltas)
+        var (x, y) = (0, 0);
+        foreach (var (command, magnitude) in await ReadInput(filename))
         {
-            position.x += delta.x;
-            position.y += delta.y;
+            var (signX, signY) = command switch
+            {
+                "forward" => (1, 0),
+                "up" => (0, -1),
+                "down" => (0, 1),
+                _ => (0, 0),
+            };
+            x += signX * magnitude;
+            y += signY * magnitude;
         }
 
-        Assert.Equal(position.x * position.y, expectation);
-    }
-
-    private static (int x, int y) ParseCommandDelta(string s)
-    {
-        // There is some matrix multiplication thing that escapes me?
-        var comps = s.Split(" ");
-        (int x, int y) sign = comps[0] switch
-        {
-            "forward" => (1, 0),
-            "up" => (0, -1),
-            "down" => (0, 1),
-            _ => (0, 0),
-        };
-
-        var magnitude = int.Parse(comps[1]);
-        return (sign.x * magnitude, sign.y * magnitude);
+        Assert.Equal(x * y, expectation);
     }
 
     [Theory]
@@ -44,29 +41,24 @@ public class Day02
     [InlineData("day02.txt", 1749524700)]
     public async Task Part2(string filename, int expectation)
     {
-        var lines = await Input.ReadAllLinesAsync(filename);
-
-        var position = (x: 0, y: 0, aim: 0);
-
-        foreach (var line in lines)
+        var (x, y, aim) = (0, 0, 0);
+        foreach (var (command, magnitude) in await ReadInput(filename))
         {
-            var comps = line.Split(" ");
-            var magnitude = int.Parse(comps[1]);
-            switch (comps[0])
+            switch (command)
             {
                 case "down":
-                    position.aim += magnitude;
+                    aim += magnitude;
                     break;
                 case "up":
-                    position.aim -= magnitude;
+                    aim -= magnitude;
                     break;
                 case "forward":
-                    position.x += magnitude;
-                    position.y += position.aim * magnitude;
+                    x += magnitude;
+                    y += aim * magnitude;
                     break;
             }
         }
 
-        Assert.Equal(position.x * position.y, expectation);
+        Assert.Equal(x * y, expectation);
     }
 }
