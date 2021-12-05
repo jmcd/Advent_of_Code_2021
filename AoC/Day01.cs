@@ -36,7 +36,10 @@ public class Day01
         var prevDepth = default(int?);
         foreach (var depth in depths)
         {
-            if (depth > prevDepth) count += 1;
+            if (depth > prevDepth)
+            {
+                count += 1;
+            }
             prevDepth = depth;
         }
         return count;
@@ -50,7 +53,10 @@ public class Day01
         foreach (var depth in values)
         {
             window[i = (i + 1) % windowLength] = depth;
-            if ((iterationCount += 1) >= windowLength) yield return window.Sum();
+            if ((iterationCount += 1) >= windowLength)
+            {
+                yield return window.Sum();
+            }
         }
     }
 }

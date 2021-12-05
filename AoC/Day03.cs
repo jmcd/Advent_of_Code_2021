@@ -27,14 +27,19 @@ public class Day03
 
         foreach (var number in numbers)
         {
-            for (var bitIndex = 0; bitIndex < numberWidth; bitIndex++) oneCounts[numberWidth - 1 - bitIndex] += (number >> bitIndex) & 1;
+            for (var bitIndex = 0; bitIndex < numberWidth; bitIndex++)
+            {
+                oneCounts[numberWidth - 1 - bitIndex] += (number >> bitIndex) & 1;
+            }
         }
 
         var gamma = 0;
         for (var bitIndex = 0; bitIndex < oneCounts.Length; bitIndex += 1)
         {
             if (oneCounts[bitIndex] > numberCount / 2)
+            {
                 gamma |= 1 << (oneCounts.Length - 1 - bitIndex);
+            }
         }
 
         var epsilon = ~gamma & ((1 << numberWidth) - 1);
@@ -51,7 +56,10 @@ public class Day03
 
         int FilterSubset(ICollection<int> numberSubset, Func<(int oneCount, int zeroCount), bool> predicateOfBitCount, int bitIndex)
         {
-            if (numberSubset.Count == 1) return numberSubset.First();
+            if (numberSubset.Count == 1)
+            {
+                return numberSubset.First();
+            }
 
             var oneCount = numberSubset.Count(i => i.GetBit(bitIndex) == 1);
             var filterBit = predicateOfBitCount((numberSubset.Count - oneCount, oneCount)) ? 1 : 0;
