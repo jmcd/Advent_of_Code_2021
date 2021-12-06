@@ -1,54 +1,40 @@
 namespace AoC;
 
-using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Xunit;
-using Xunit.Abstractions;
 
 public class Day06
 {
-    private ITestOutputHelper _op;
-
-    public Day06(ITestOutputHelper op) => _op = op;
-
     [Theory]
-    [InlineData("day06_example.txt", 5934)]
-    [InlineData("day06.txt", 372984)]
-    public async Task Part1(string filename, int expectation)
+    [InlineData("day06_example.txt", 18, 26)]
+    [InlineData("day06_example.txt", 80, 5934)]
+    [InlineData("day06_example.txt", 256, 26984457539)]
+    [InlineData("day06.txt", 80, 372984)]
+    [InlineData("day06.txt", 256, 1681503251694)]
+    public async Task Part1And2(string filename, int numberOfDays, long expectation)
     {
-        var fishes = (await Input.ReadSingleLineAsync(filename)).Split(",").Select(int.Parse).ToList();
+        var fishAges = (await Input.ReadSingleLineAsync(filename)).Split(",").Select(int.Parse).ToList();
 
-        for (var day = 1; day <= 80; day++)
+        const int maxAge = 8;
+
+        var startIndex = 0;
+        var numberOfFishAtAgeIndicatedByArrayIndex = new long[maxAge + 1];
+
+        foreach (var fishAge in fishAges)
         {
-            var nextFishes = new List<int>();
-            var numberOfNewFish = 0;
-            foreach (var fish in fishes)
-            {
-                int nextFish;
-                if (fish == 0)
-                {
-                    nextFish = 6;
-                    numberOfNewFish++;
-                }
-                else
-                {
-                    nextFish = fish - 1;
-                }
-                nextFishes.Add(nextFish);
-            }
-            for (var newFishIndex = 0; newFishIndex < numberOfNewFish; newFishIndex++)
-            {
-                nextFishes.Add(8);
-            }
-            fishes = nextFishes;
+            numberOfFishAtAgeIndicatedByArrayIndex[fishAge]++;
         }
 
-        Assert.Equal(expectation, fishes.Count());
-    }
+        // Instead of decrementing the array, just change what the start (and end) index of the array is
 
-    private void DumpFishes(IEnumerable<int> fishes)
-    {
-        _op.WriteLine(string.Join(',', fishes));
+        for (var i = 0; i < numberOfDays; i++)
+        {
+            var endIndex = (startIndex + numberOfFishAtAgeIndicatedByArrayIndex.Length - 2) % numberOfFishAtAgeIndicatedByArrayIndex.Length;
+            numberOfFishAtAgeIndicatedByArrayIndex[endIndex] += numberOfFishAtAgeIndicatedByArrayIndex[startIndex];
+            startIndex = (startIndex + 1) % numberOfFishAtAgeIndicatedByArrayIndex.Length;
+        }
+
+        Assert.Equal(expectation, numberOfFishAtAgeIndicatedByArrayIndex.Sum());
     }
 }
