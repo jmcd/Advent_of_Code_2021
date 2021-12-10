@@ -1,4 +1,4 @@
-namespace AoC.input;
+namespace AoC;
 
 using System.Collections.Generic;
 using System.Diagnostics;
