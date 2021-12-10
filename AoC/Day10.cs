@@ -8,9 +8,9 @@ using Xunit;
 public class Day10
 {
     [Theory]
-    [InlineData("day10_example.txt", 26397)]
-    [InlineData("day10.txt", 26397)]
-    public async void Part1(string filename, int expectation)
+    [InlineData("day10_example.txt", 26397, 288957)]
+    [InlineData("day10.txt", 323613, 3103006161)]
+    public async void Part1And2(string filename, int expectedSyntaxErrorScoreForPart1, long expectedMiddleCompletionScoreForPart2)
     {
         var lines = await Input.ReadAllLinesAsync(filename);
 
@@ -19,11 +19,14 @@ public class Day10
 
         var openerToCloser = openers.Zip(closers).ToDictionary(oc => oc.First, oc => oc.Second);
 
-        var score = 0;
+        var syntaxErrorScore = 0;
+        var completionScores = new List<long>();
+
         foreach (var line in lines)
         {
             var corruptingChar = default(char?);
             var stack = new Stack<char>();
+
             foreach (var c in line)
             {
                 if (openerToCloser.ContainsKey(c))
@@ -34,19 +37,39 @@ public class Day10
                 {
                     var opener = stack.Pop();
                     var expectedCloser = openerToCloser[opener];
-                    if (c != expectedCloser)
+                    if (c == expectedCloser)
                     {
-                        corruptingChar = c;
-                        break;
+                        continue;
                     }
+                    corruptingChar = c;
+                    break;
                 }
             }
-            score += Score(corruptingChar) ?? 0;
+
+            if (corruptingChar.HasValue)
+            {
+                syntaxErrorScore += SyntaxErrorScore(corruptingChar.Value);
+            }
+            else
+            {
+                var lineCompletionScore = 0L;
+                while (stack.TryPop(out var opener))
+                {
+                    var closer = openerToCloser[opener];
+                    lineCompletionScore = lineCompletionScore * 5 + CompletionScore(closer);
+                }
+                completionScores.Add(lineCompletionScore);
+            }
         }
-        Assert.Equal(expectation, score);
+
+        completionScores.Sort();
+        var middleCompletionScore = completionScores[completionScores.Count / 2];
+
+        Assert.Equal(expectedSyntaxErrorScoreForPart1, syntaxErrorScore);
+        Assert.Equal(expectedMiddleCompletionScoreForPart2, middleCompletionScore);
     }
 
-    private static int? Score(char? corruptingChar)
+    private static int SyntaxErrorScore(char corruptingChar)
     {
         return corruptingChar switch
         {
@@ -54,8 +77,19 @@ public class Day10
             ']' => 57,
             '}' => 1197,
             '>' => 25137,
-            null => null,
             _ => throw new ArgumentException(null, nameof(corruptingChar)),
+        };
+    }
+
+    private static long CompletionScore(char closer)
+    {
+        return closer switch
+        {
+            ')' => 1,
+            ']' => 2,
+            '}' => 3,
+            '>' => 4,
+            _ => throw new ArgumentException(null, nameof(closer)),
         };
     }
 }
