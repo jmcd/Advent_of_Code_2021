@@ -10,9 +10,6 @@ using Xunit.Abstractions;
 
 public class Day08
 {
-    private ITestOutputHelper _op;
-    public Day08(ITestOutputHelper op) => _op = op;
-
     [Theory]
     [InlineData("day08_example02.txt", 26)]
     [InlineData("day08.txt", 352)]
