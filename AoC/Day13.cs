@@ -8,6 +8,13 @@ using Xunit;
 
 public class Day13
 {
+    private const string Part2ExampleExpectation =
+        "#####\n" +
+        "#...#\n" +
+        "#...#\n" +
+        "#...#\n" +
+        "#####\n";
+
     private const string Part2Expectation =
         "###...##..####.#....###..#..#.####.###.\n" +
         "#..#.#..#....#.#....#..#.#..#.#....#..#\n" +
@@ -38,7 +45,7 @@ public class Day13
     }
 
     [Theory]
-    //[InlineData("day13_example.txt", 17)]
+    [InlineData("day13_example.txt", Part2ExampleExpectation)]
     [InlineData("day13.txt", Part2Expectation)]
     public async Task Part2(string filename, string expectation)
     {
