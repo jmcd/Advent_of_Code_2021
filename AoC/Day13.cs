@@ -8,6 +8,14 @@ using Xunit;
 
 public class Day13
 {
+    private const string Part2Expectation =
+        "###...##..####.#....###..#..#.####.###.\n" +
+        "#..#.#..#....#.#....#..#.#..#.#....#..#\n" +
+        "#..#.#......#..#....###..####.###..#..#\n" +
+        "###..#.##..#...#....#..#.#..#.#....###.\n" +
+        "#.#..#..#.#....#....#..#.#..#.#....#...\n" +
+        "#..#..###.####.####.###..#..#.#....#...\n";
+
     [Theory]
     [InlineData("day13_example.txt", 17)]
     [InlineData("day13.txt", 729)]
@@ -24,12 +32,39 @@ public class Day13
 
         var map = CreateDotMap(dots);
 
-        var visibleDotCount = map.Count(b => b);
+        var visibleDotCount = map.Data.Count(b => b);
 
-        Assert.Equal(visibleDotCount, expectation);
+        Assert.Equal(expectation, visibleDotCount);
     }
 
-    private static bool[] CreateDotMap(List<Dot> dots)
+    [Theory]
+    //[InlineData("day13_example.txt", 17)]
+    [InlineData("day13.txt", Part2Expectation)]
+    public async Task Part2(string filename, string expectation)
+    {
+        var (dots, folds) = await ReadInput(filename);
+
+        foreach (var fold in folds)
+        {
+            for (var i = 0; i < dots.Count; i++)
+            {
+                dots[i] = dots[i].Folding(fold);
+            }
+        }
+
+        var map = CreateDotMap(dots);
+
+        var s = "";
+        for (var i = 0; i < map.Data.Length; i++)
+        {
+            s += map.Data[i] ? '#' : '.';
+            if ((i + 1) % map.Width == 0) { s += "\n"; }
+        }
+
+        Assert.Equal(expectation, s);
+    }
+
+    private static (bool[] Data, int Width) CreateDotMap(List<Dot> dots)
     {
         var width = dots.Select(d => d.X).Max() + 1;
         var height = dots.Select(d => d.Y).Max() + 1;
@@ -38,7 +73,7 @@ public class Day13
         {
             map[i] = true;
         }
-        return map;
+        return (map, width);
     }
 
     private static async Task<(List<Dot> dots, List<Fold> folds)> ReadInput(string filename)
