@@ -3,55 +3,51 @@ namespace AoC;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
 using Xunit;
 
 public class Day14
 {
     [Theory]
-    [InlineData("day14_example.txt", 1588)]
-    [InlineData("day14.txt", 2602)]
-    public async Task Part1(string filename, int expectation)
+    [InlineData("day14_example.txt", 10, 1588)]
+    [InlineData("day14.txt", 10, 2602)]
+    [InlineData("day14_example.txt", 40, 2188189693529)]
+    [InlineData("day14.txt", 40, 2942885922173)]
+    public async Task Part1And2(string filename, int numberOfSteps, long expectation)
     {
         var (polymerTemplate, pairInsertions) = await ReadInput(filename);
 
-        for (var i = 0; i < 10; i++)
+        var elementCount = new Dictionary<char, long>();
+        foreach (var element in polymerTemplate)
         {
-            var pairs = Pairs(polymerTemplate).ToArray();
+            elementCount[element] = elementCount.GetValueOrDefault(element, 0) + 1;
+        }
 
-            var next = new StringBuilder().Append(pairs[0].Left);
-            foreach (var pair in pairs)
+        var elementPairCount = pairInsertions.ToDictionary(kvp => kvp.Key, _ => 0L);
+        for (var i = 1; i < polymerTemplate.Length; i++)
+        {
+            var pair = new Pair(polymerTemplate[i - 1], polymerTemplate[i]);
+            elementPairCount[pair] = elementPairCount.GetValueOrDefault(pair, 0) + 1;
+        }
+
+        for (var i = 0; i < numberOfSteps; i++)
+        {
+            foreach (var ((pair, element), pairCountSnapshot) in pairInsertions.Select(pi => (pi, elementPairCount[pi.Key])).ToArray())
             {
-                if (pairInsertions.TryGetValue(pair, out var insertion))
-                {
-                    next.Append(insertion);
-                }
-                next.Append(pair.Right);
+                // Update the element count
+                elementCount[element] = elementCount.GetValueOrDefault(element, 0) + pairCountSnapshot;
+
+                // Remove the count from the current pair
+                elementPairCount[pair] -= pairCountSnapshot;
+
+                // Reassign the count to the two new replacement pairs
+                elementPairCount[new Pair(pair.Left, element)] += pairCountSnapshot;
+                elementPairCount[new Pair(element, pair.Right)] += pairCountSnapshot;
             }
-            polymerTemplate = next.ToString();
         }
 
-        var (min, max) = GetMinMaxElementCount(polymerTemplate);
-
-        Assert.Equal(expectation, max.Count - min.Count);
-    }
-
-    private static ((char Element, int Count) Min, (char Element, int Count) Max) GetMinMaxElementCount(string polymerTemplate)
-    {
-        if (polymerTemplate.Length == 0) { throw new ArgumentException($"{nameof(polymerTemplate)} is zero length", nameof(polymerTemplate)); }
-
-        var counts = polymerTemplate.ToCountDictionary();
-
-        KeyValuePair<char, int>? min = null;
-        KeyValuePair<char, int>? max = null;
-        foreach (var kvp in counts)
-        {
-            if (min is null || kvp.Value < min.Value.Value) { min = kvp; }
-            if (max is null || kvp.Value > max.Value.Value) { max = kvp; }
-        }
-
-        return ((min!.Value.Key, min!.Value.Value), (max!.Value.Key, max!.Value.Value));
+        var diff = elementCount.Max(kvp => kvp.Value) - elementCount.Min(kvp => kvp.Value);
+        Assert.Equal(expectation, diff);
     }
 
     private static async Task<(string polymerTemplate, Dictionary<Pair, char> pairInsertions)> ReadInput(string filename)
@@ -72,14 +68,6 @@ public class Day14
         if (polymerTemplate is null) { throw new Exception("Did not find polymer template"); }
 
         return (polymerTemplate, pairInsertions);
-    }
-
-    private IEnumerable<Pair> Pairs(string polymerTemplate)
-    {
-        for (var i = 1; i < polymerTemplate.Length; i++)
-        {
-            yield return new Pair(polymerTemplate[i - 1], polymerTemplate[i]);
-        }
     }
 
     private record struct Pair(char Left, char Right);
