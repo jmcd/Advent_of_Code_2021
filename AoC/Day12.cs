@@ -84,12 +84,7 @@ public class Day12
 
             exitCaves = exitCaves.Except(visitedSmallCaves).ToArray();
 
-            var canVisitASmallCave = visitedSmallCaves.Aggregate(new Dictionary<string, int>(), (caveToCount, cave) =>
-            {
-                if (!caveToCount.TryGetValue(cave, out var currentCount)) { currentCount = 0; }
-                caveToCount[cave] = currentCount + 1;
-                return caveToCount;
-            }).All(kvp => kvp.Value == 1);
+            var canVisitASmallCave = visitedSmallCaves.ToCountDictionary().All(kvp => kvp.Value == 1);
 
             if (canVisitASmallCave)
             {
