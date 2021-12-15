@@ -108,20 +108,6 @@ public class Day15
         var x = currentIndex % width;
         var y = currentIndex / width;
 
-        // var res = new List<int>();
-        //
-        // if (y > 0) { res.Add(currentIndex - width); }
-        // if (x > 0) { res.Add(currentIndex - 1); }
-        // if (x < width - 1) { res.Add(currentIndex + 1);}
-        // if (y < height - 1) { res.Add(currentIndex + width);}
-        //
-        // return res;
-
-        // if (y > 0) { yield return currentIndex - width; }
-        // if (x > 0) { yield return currentIndex - 1; }
-        // if (x < width - 1) { yield return currentIndex + 1;}
-        // if (y < height - 1) { yield return currentIndex + width;}
-
         return new int?[]
         {
             y == 0 ? null : currentIndex - width,
