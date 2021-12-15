@@ -8,14 +8,29 @@ using Xunit;
 public class Day15
 {
     [Theory]
-    [InlineData("day15_example.txt", 40)]
-    [InlineData("day15.txt", 498)]
-    public async Task Part1(string filename, int expectation)
+    [InlineData("day15_example.txt", 1, 40)]
+    [InlineData("day15.txt", 1, 498)]
+    [InlineData("day15_example.txt", 5, 315)]
+    // [InlineData("day15.txt", 5, 2901)] slow, so commented out
+    public async Task Part1And2(string filename, int caveSizeMultiplier, int expectation)
     {
         var lines = await Input.ReadAllLinesAsync(filename);
-        var cavernWidth = lines[0].Length;
-        var cavernHeight = lines.Length;
-        var riskLevels = lines.SelectMany(line => line.Select(c => int.Parse(c.ToString()))).ToArray();
+        var inputWidth = lines[0].Length;
+        var inputHeight = lines.Length;
+        var inputRiskLevels = lines.SelectMany(line => line.Select(c => int.Parse(c.ToString()))).ToArray();
+
+        var cavernWidth = inputWidth * caveSizeMultiplier;
+        var cavernHeight = inputHeight * caveSizeMultiplier;
+
+        var riskLevels = new int[inputRiskLevels.Length * caveSizeMultiplier * caveSizeMultiplier];
+        for (var node = 0; node < riskLevels.Length; node++)
+        {
+            var x = node % cavernWidth % inputWidth;
+            var y = node / cavernWidth % inputHeight;
+            var i = y * inputWidth + x;
+            var riskLevel = inputRiskLevels[i] + node % cavernWidth / inputWidth + node / cavernWidth / inputHeight;
+            riskLevels[node] = riskLevel > 9 ? riskLevel % 9 : riskLevel;
+        }
 
         // Dijkstra's algorithm
         // https://en.wikipedia.org/wiki/Dijkstra's_algorithm
@@ -25,17 +40,18 @@ public class Day15
         // Dijkstra's algorithm will initially start with infinite distances and will try to improve them step by step.
         const int initialNode = 0;
         var currentNode = initialNode;
-        var destinationNode = riskLevels.Length - 1;
+        var nodeCount = cavernWidth * cavernHeight;
+        var destinationNode = nodeCount - 1;
 
         // 1. Mark all nodes unvisited. Create a set of all the unvisited nodes called the unvisited set.
-        var unvisitedSet = Enumerable.Repeat(true, riskLevels.Length).ToArray();
+        var unvisitedSet = Enumerable.Repeat(true, nodeCount).ToArray();
 
         // 2. Assign to every node a tentative distance value: set it to zero for our initial node and to infinity for
         // all other nodes. The tentative distance of a node v is the length of the shortest path discovered so far
         // between the node v and the starting node. Since initially no path is known to any other vertex than the
         // source itself (which is a path of length zero), all other tentative distances are initially set to infinity.
         // Set the initial node as current.
-        var tentativeDistances = new int?[riskLevels.Length];
+        var tentativeDistances = new int?[nodeCount];
         tentativeDistances[initialNode] = 0;
 
         while (true)
@@ -46,7 +62,7 @@ public class Day15
             // edge connecting it with a neighbor B has length 2, then the distance to B through A will be 6 + 2 = 8. If
             // B was previously marked with a distance greater than 8 then change it to 8. Otherwise, the current value
             // will be kept.
-            var unvisitedNeighbours = IndicesOfNeighbours(currentNode, cavernWidth, cavernHeight).Where(i => unvisitedSet[i]);
+            var unvisitedNeighbours = IndicesOfNeighbours(currentNode, cavernWidth, cavernHeight).Where(i => unvisitedSet[i]).ToArray();
             foreach (var unvisitedNeighbour in unvisitedNeighbours)
             {
                 var currentDistance = tentativeDistances[currentNode];
@@ -70,19 +86,41 @@ public class Day15
 
             // 6. Otherwise, select the unvisited node that is marked with the smallest tentative distance, set it as
             // the new current node, and go back to step 3.
-            currentNode = unvisitedSet
-                .Select((isUnvisited, node) => (node, tentativeDistance: isUnvisited ? tentativeDistances[node] : null))
-                .Where(x => x.tentativeDistance.HasValue)
-                .MinBy(x => x.tentativeDistance).node;
+            var min = default((int node, int tentativeDistance)?);
+            for (var node = 0; node < unvisitedSet.Length; node++)
+            {
+                if (!unvisitedSet[node]) { continue; }
+                var tentativeDistance = tentativeDistances[node];
+                if (!tentativeDistance.HasValue) { continue; }
+                if (!min.HasValue || min.Value.tentativeDistance > tentativeDistance.Value)
+                {
+                    min = (node, tentativeDistance.Value);
+                }
+            }
+            currentNode = min!.Value.node;
         }
 
-        Assert.Equal(tentativeDistances[destinationNode], expectation);
+        Assert.Equal(expectation, tentativeDistances[destinationNode]);
     }
 
     private static IEnumerable<int> IndicesOfNeighbours(int currentIndex, int width, int height)
     {
         var x = currentIndex % width;
         var y = currentIndex / width;
+
+        // var res = new List<int>();
+        //
+        // if (y > 0) { res.Add(currentIndex - width); }
+        // if (x > 0) { res.Add(currentIndex - 1); }
+        // if (x < width - 1) { res.Add(currentIndex + 1);}
+        // if (y < height - 1) { res.Add(currentIndex + width);}
+        //
+        // return res;
+
+        // if (y > 0) { yield return currentIndex - width; }
+        // if (x > 0) { yield return currentIndex - 1; }
+        // if (x < width - 1) { yield return currentIndex + 1;}
+        // if (y < height - 1) { yield return currentIndex + width;}
 
         return new int?[]
         {
