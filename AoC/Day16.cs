@@ -5,13 +5,9 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Xunit;
-using Xunit.Abstractions;
 
 public class Day16
 {
-    private ITestOutputHelper _op;
-    public Day16(ITestOutputHelper op) => _op = op;
-
     [Theory]
     [InlineData("D2FE28", null, 0b110)]
     [InlineData("38006F45291200", null, 0b001 + 0b110 + 0b10)]
@@ -23,18 +19,15 @@ public class Day16
     [InlineData(null, "day16.txt", 989)]
     public async Task Part1(string? input, string? filename, int expectation)
     {
-        string nullSafeInput;
-        if (input is not null) { nullSafeInput = input; }
-        else if (filename is not null) { nullSafeInput = await Input.ReadSingleLineAsync(filename); }
-        else { throw new(); }
+        var hexInput = await GetHexInput(input, filename);
+        var rootPacket = new PacketReader(hexInput).ReadRootPacket();
 
-        IEnumerable<int> GetAllVersions(IPacket packet)
+        IEnumerable<int> GetAllVersions(Packet packet)
         {
-            void Recurse(IPacket packet, ICollection<int> versions)
+            void Recurse(Packet packet, ICollection<int> versions)
             {
                 versions.Add(packet.Version);
-                if (packet is not Operator @operator) { return; }
-                foreach (var subPacket in @operator.SubPackets)
+                foreach (var subPacket in packet.SubPackets)
                 {
                     Recurse(subPacket, versions);
                 }
@@ -45,99 +38,169 @@ public class Day16
             return versions;
         }
 
-        var bits = new InputBits(nullSafeInput);
-
-        var rootPacket = ReadPacket(bits);
-
-        if (bits.Remaining > 0)
-        {
-            _op.WriteLine($"checking final {bits.Remaining} are zero");
-            var read = bits.Read(bits.Remaining);
-            Assert.Equal(0, read);
-        }
-
         var versionSum = GetAllVersions(rootPacket).Sum();
 
         Assert.Equal(expectation, versionSum);
     }
 
-    private IPacket ReadPacket(InputBits bits)
+    [Theory]
+    [InlineData("C200B40A82", null, 3)]
+    [InlineData("04005AC33890", null, 54)]
+    [InlineData("880086C3E88112", null, 7)]
+    [InlineData("CE00C43D881120", null, 9)]
+    [InlineData("D8005AC2A8F0", null, 1)]
+    [InlineData("F600BC2D8F", null, 0)]
+    [InlineData("9C005AC2F8F0", null, 0)]
+    [InlineData("9C0141080250320F1802104A08", null, 1)]
+    [InlineData(null, "day16.txt", 7936430475134)]
+    public async Task Part2(string? input, string? filename, long expectation)
     {
-        var version = bits.Read(3);
-        var typeID = bits.Read(3);
+        var hexInput = await GetHexInput(input, filename);
+        var rootPacket = new PacketReader(hexInput).ReadRootPacket();
+        var value = rootPacket.CalculateValue();
+        Assert.Equal(expectation, value);
+    }
 
-        _op.WriteLine($"version {version}");
+    private static async Task<string> GetHexInput(string? input, string? filename)
+    {
+        if (input is not null) { return input; }
+        if (filename is not null) { return await Input.ReadSingleLineAsync(filename); }
+        throw new();
+    }
 
-        if (typeID == 4) // literal value
+    private class PacketReader
+    {
+        private readonly InputBits bits;
+
+        public PacketReader(string hexInput) => bits = new(hexInput);
+
+        public Packet ReadRootPacket()
         {
-            _op.WriteLine("reading literal...");
+            var rootPacket = ReadPacket();
 
-            var read = 0;
-            var literal = 0;
+            if (bits.Remaining > 0)
+            {
+                var read = bits.Read(bits.Remaining);
+                if (read != 0) { throw new(); }
+            }
+            return rootPacket;
+        }
+
+        private Packet ReadPacket()
+        {
+            var version = bits.Read(3);
+            var typeId = (TypeId)bits.Read(3);
+            return typeId == TypeId.Literal ? ReadLiteral(version) : ReadOperator(version, typeId);
+        }
+
+        private Packet ReadOperator(int version, TypeId typeID)
+        {
+            var subPackets = ReadSubPackets();
+
+            return Packet.Operator(version, typeID, subPackets);
+        }
+
+        private Packet ReadLiteral(int version)
+        {
+            int read;
+            var literalValue = 0L;
             do
             {
                 read = bits.Read(5);
-                var val = read & 0b01111;
-                literal = (literal << 4) | val;
+                long val = read & 0b01111;
+                literalValue = (literalValue << 4) | val;
             } while (read >> 4 == 1);
-
-            _op.WriteLine($"read {literal}");
-
-            return new Literal(version);
+            return Packet.Literal(version, literalValue);
         }
 
-        _op.WriteLine("reading operator...");
-
-        var lengthTypeID = bits.Read(1);
-
-        _op.WriteLine($"read lengthTypeID: {lengthTypeID}");
-
-        switch (lengthTypeID)
+        private IEnumerable<Packet> ReadSubPackets()
         {
-            // If the length type ID is 0, then the next 15 bits are a number that represents the total length in bits of the sub-packets contained by this packet.
-            case 0:
+            var lengthTypeId = bits.Read(1);
+            switch (lengthTypeId)
             {
-                var totalLengthInBits = bits.Read(15);
-
-                _op.WriteLine($"read totalLengthInBits: {totalLengthInBits}");
-
-                var start = bits.Position;
-
-                var subPackets = new List<IPacket>();
-                while (bits.Position - start != totalLengthInBits)
-                {
-                    subPackets.Add(ReadPacket(bits));
-                    _op.WriteLine($"did read {bits.Position - start} bits");
-                }
-                _op.WriteLine("done reading sub-packets");
-
-                return new Operator(version, subPackets.ToArray());
+                case 0: return ReadSubPacketsOfSpecifiedLength();
+                case 1: return ReadSpecifiedNumberOfSubPackets();
+                default: throw new();
             }
-            // If the length type ID is 1, then the next 11 bits are a number that represents the number of sub-packets immediately contained by this packet.
-            case 1:
+        }
+
+        private IEnumerable<Packet> ReadSpecifiedNumberOfSubPackets()
+        {
+            var numberOfSubPacketsImmediatelyContainedByThisPacket = bits.Read(11);
+            for (var i = 0; i < numberOfSubPacketsImmediatelyContainedByThisPacket; i++)
             {
-                var numberOfSubPacketsImmediatelyContainedByThisPacket = bits.Read(11);
-
-                var subPackets = new List<IPacket>();
-                for (var i = 0; i < numberOfSubPacketsImmediatelyContainedByThisPacket; i++)
-                {
-                    subPackets.Add(ReadPacket(bits));
-                }
-                return new Operator(version, subPackets.ToArray());
+                yield return ReadPacket();
             }
-            default:
-                throw new();
+        }
+
+        private IEnumerable<Packet> ReadSubPacketsOfSpecifiedLength()
+        {
+            var totalLengthInBits = bits.Read(15);
+            var start = bits.Position;
+            while (bits.Position - start != totalLengthInBits)
+            {
+                yield return ReadPacket();
+            }
         }
     }
 
-    private interface IPacket
+    private enum TypeId
     {
-        int Version { get; }
+        Sum,
+        Product,
+        Minimum,
+        Maximum,
+        Literal,
+        GreaterThan,
+        LessThan,
+        EqualTo,
     }
 
-    private record Literal(int Version) : IPacket { }
+    private record Packet
+    {
+        private Packet(int version, TypeId typeId, Packet[] subPackets, long? literalValue)
+        {
+            Version = version;
+            TypeId = typeId;
+            SubPackets = subPackets;
+            LiteralValue = literalValue;
+        }
 
-    private record Operator(int Version, IPacket[] SubPackets) : IPacket;
+        public int Version { get; }
+        private TypeId TypeId { get; }
+        public Packet[] SubPackets { get; }
+        private long? LiteralValue { get; }
+
+        public static Packet Literal(int version, long value) => new(version, TypeId.Literal, Array.Empty<Packet>(), value);
+        public static Packet Operator(int version, TypeId typeId, IEnumerable<Packet> subPackets) => new(version, typeId, subPackets.ToArray(), default);
+
+        public long CalculateValue()
+        {
+            var subPacketValues = SubPackets.Select(sp => sp.CalculateValue()).ToArray();
+            switch (TypeId)
+            {
+                case TypeId.Sum:
+                    return subPacketValues.Sum();
+                case TypeId.Product:
+                    return subPacketValues.Aggregate(1L, (acc, spv) => acc * spv);
+                case TypeId.Minimum:
+                    return subPacketValues.Min();
+                case TypeId.Maximum:
+                    return subPacketValues.Max();
+                case TypeId.Literal:
+                    return LiteralValue!.Value;
+                case TypeId.GreaterThan:
+                    return subPacketValues[0] > subPacketValues[1] ? 1 : 0;
+                case TypeId.LessThan:
+                    return subPacketValues[0] < subPacketValues[1] ? 1 : 0;
+                case TypeId.EqualTo:
+                    var value = subPacketValues[0] == subPacketValues[1] ? 1 : 0;
+                    return value;
+                default:
+                    throw new ArgumentOutOfRangeException();
+            }
+        }
+    }
 
     private class InputBits
     {
