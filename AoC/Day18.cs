@@ -14,12 +14,17 @@ public class Day18
     public Day18(ITestOutputHelper op) => _op = op;
 
     [Theory]
-    [InlineData("[[[[[9,8],1],2],3],4]", "[[[[0,9],2],3],4]")]
-    [InlineData("[7,[6,[5,[4,[3,2]]]]]", "[7,[6,[5,[7,0]]]]")]
-    [InlineData("[[6,[5,[4,[3,2]]]],1]", "[[6,[5,[7,0]]],3]")]
-    [InlineData("[[3,[2,[1,[7,3]]]],[6,[5,[4,[3,2]]]]]", "[[3,[2,[8,0]]],[9,[5,[4,[3,2]]]]]")]
-    [InlineData("[[3,[2,[8,0]]],[9,[5,[4,[3,2]]]]]", "[[3,[2,[8,0]]],[9,[5,[7,0]]]]")]
-    public void TestSingleExplode(string input, string expectation)
+    [InlineData("[[[[[9,8],1],2],3],4]", 1, "[[[[0,9],2],3],4]")]
+    [InlineData("[7,[6,[5,[4,[3,2]]]]]", 1, "[7,[6,[5,[7,0]]]]")]
+    [InlineData("[[6,[5,[4,[3,2]]]],1]", 1, "[[6,[5,[7,0]]],3]")]
+    [InlineData("[[3,[2,[1,[7,3]]]],[6,[5,[4,[3,2]]]]]", 1, "[[3,[2,[8,0]]],[9,[5,[4,[3,2]]]]]")]
+    [InlineData("[[3,[2,[8,0]]],[9,[5,[4,[3,2]]]]]", 1, "[[3,[2,[8,0]]],[9,[5,[7,0]]]]")]
+    [InlineData("[[[[[4,3],4],4],[7,[[8,4],9]]],[1,1]]", 1, "[[[[0,7],4],[7,[[8,4],9]]],[1,1]]")]
+    [InlineData("[[[[[4,3],4],4],[7,[[8,4],9]]],[1,1]]", 2, "[[[[0,7],4],[15,[0,13]]],[1,1]]")]
+    [InlineData("[[[[[4,3],4],4],[7,[[8,4],9]]],[1,1]]", 3, "[[[[0,7],4],[[7,8],[0,13]]],[1,1]]")]
+    [InlineData("[[[[[4,3],4],4],[7,[[8,4],9]]],[1,1]]", 4, "[[[[0,7],4],[[7,8],[0,[6,7]]]],[1,1]]")]
+    [InlineData("[[[[[4,3],4],4],[7,[[8,4],9]]],[1,1]]", 5, "[[[[0,7],4],[[7,8],[6,0]]],[8,1]]")]
+    public void TestSingleExplode(string input, int numberOfPasses, string expectation)
     {
         Debug.WriteLine(expectation);
 
@@ -27,9 +32,22 @@ public class Day18
 
         var tokens = new Tokenizer(input).Tokenize();
 
+        for (var pass = 0; pass < numberOfPasses; pass++)
+        {
+            _op.WriteLine($"pass {pass}");
+            PerformPass(tokens);
+        }
+
+        var actual = tokens.Aggregate(new StringBuilder(), (builder, token) => builder.Append(token.Body)).ToString();
+        Assert.Equal(expectation, actual);
+    }
+
+    private void PerformPass(IList<Token> tokens)
+    {
         var level = 0;
         var leftNumberIndex = default(int?);
-        for (var index = 0; index < tokens.Count; index++)
+        var didMutate = false;
+        for (var index = 0; !didMutate && index < tokens.Count; index++)
         {
             var token = tokens[index];
             switch (token.TokenKind)
@@ -37,8 +55,19 @@ public class Day18
                 case TokenKind.Separator:
                     break;
                 case TokenKind.Number:
-                    if (level == 5)
+
+                    if (token.Body.Length > 1)
                     {
+                        _op.WriteLine($"split {tokens[index].Body}...");
+                        Split(tokens, index);
+                        _op.WriteLine($"...result {tokens[index].Body}");
+                        didMutate = true;
+                        break;
+                    }
+
+                    if (level > 4)
+                    {
+                        _op.WriteLine("level == 5");
                         Assert.Equal(TokenKind.Separator, tokens[index + 1].TokenKind);
                         Assert.Equal(TokenKind.Number, tokens[index + 2].TokenKind);
                         Assert.Equal(TokenKind.Closer, tokens[index + 3].TokenKind);
@@ -55,29 +84,20 @@ public class Day18
                         if (leftNumberIndex.HasValue)
                         {
                             _op.WriteLine($"add left value ({token.Body}) to {tokens[leftNumberIndex.Value].Body}");
-                            var n0 = int.Parse(token.Body);
-                            var n1 = int.Parse(tokens[leftNumberIndex.Value].Body);
-                            tokens[leftNumberIndex.Value] = new((n0 + n1).ToString(), TokenKind.Number);
+                            Explode(tokens, index, leftNumberIndex.Value);
                         }
 
                         if (rightNumberIndex.HasValue)
                         {
                             _op.WriteLine($"add right value ({tokens[index + 2].Body}) to {tokens[rightNumberIndex.Value].Body}");
-                            var n0 = int.Parse(tokens[index + 2].Body);
-                            var n1 = int.Parse(tokens[rightNumberIndex.Value].Body);
-                            tokens[rightNumberIndex.Value] = new((n0 + n1).ToString(), TokenKind.Number);
+                            Explode(tokens, index + 2, rightNumberIndex.Value);
                         }
 
                         _op.WriteLine($"replace tokens {tokens[index - 1].Body} {tokens[index].Body} {tokens[index + 1].Body} {tokens[index + 2].Body} {tokens[index + 3].Body} with 0");
 
-                        for (var i = 3; i >= -1; i -= 1)
-                        {
-                            tokens.RemoveAt(index + i);
-                        }
-                        tokens.Insert(index-1, new("0", TokenKind.Number));
+                        ReplacePairWithZero(tokens, index - 1);
 
-
-                        goto outer;
+                        didMutate = true;
                     }
                     else
                     {
@@ -94,19 +114,61 @@ public class Day18
                     throw new ArgumentOutOfRangeException();
             }
         }
-        outer:
+    }
 
-        var actual = tokens.Aggregate(new StringBuilder(), (builder, token) => builder.Append(token.Body)).ToString();
-        Assert.Equal(expectation, actual);
+    private static void ReplacePairWithZero(IList<Token> tokens, int indexOfPairOpening)
+    {
+        for (var i = 4; i >= 0; i -= 1)
+        {
+            tokens.RemoveAt(indexOfPairOpening + i);
+        }
+        tokens.Insert(indexOfPairOpening, new("0", TokenKind.Number));
+    }
 
-        // var parser = new Parser(input);
-        // var pair = parser.Parse();
-        //
-        //
-        //
-        //
-        // _op.WriteLine(input);
-        // Assert.Equal(expectation, pair.ToString());
+    private static void ExplodeAndSplit(IList<Token> tokens, int indexOfExplodingNumber, int indexOfNumberThatIsBeingAddedTo)
+    {
+        var n0 = int.Parse(tokens[indexOfExplodingNumber].Body);
+        var n1 = int.Parse(tokens[indexOfNumberThatIsBeingAddedTo].Body);
+        var n = n0 + n1;
+        if (n < 10)
+        {
+            tokens[indexOfNumberThatIsBeingAddedTo] = new(n.ToString(), TokenKind.Number);
+        }
+        else
+        {
+            var l = n / 2;
+            var r = n - l;
+            tokens[indexOfNumberThatIsBeingAddedTo] = new("]", TokenKind.Closer);
+            tokens.Insert(indexOfNumberThatIsBeingAddedTo - 1, new(r.ToString(), TokenKind.Number));
+            tokens.Insert(indexOfNumberThatIsBeingAddedTo - 1, new(",", TokenKind.Separator));
+            tokens.Insert(indexOfNumberThatIsBeingAddedTo - 1, new(l.ToString(), TokenKind.Number));
+            tokens.Insert(indexOfNumberThatIsBeingAddedTo - 1, new("[", TokenKind.Opener));
+        }
+    }
+
+    private void Split(IList<Token> tokens, int index)
+    {
+        var n = int.Parse(tokens[index].Body);
+        _op.WriteLine(tokens.Aggregate(new StringBuilder(), (builder, token) => builder.Append(token.Body)).ToString());
+        var l = n / 2;
+        var r = n - l;
+
+        tokens.RemoveAt(index);
+
+        tokens.Insert(index, new("]", TokenKind.Closer));
+        tokens.Insert(index, new(r.ToString(), TokenKind.Number));
+        tokens.Insert(index, new(",", TokenKind.Separator));
+        tokens.Insert(index, new(l.ToString(), TokenKind.Number));
+        tokens.Insert(index, new("[", TokenKind.Opener));
+    }
+
+    private static void Explode(IList<Token> tokens, int indexOfExplodingNumber, int indexOfNumberThatIsBeingAddedTo)
+    {
+        var n0 = int.Parse(tokens[indexOfExplodingNumber].Body);
+        var n1 = int.Parse(tokens[indexOfNumberThatIsBeingAddedTo].Body);
+        var n = n0 + n1;
+
+        tokens[indexOfNumberThatIsBeingAddedTo] = new(n.ToString(), TokenKind.Number);
     }
 
     private void Explode3(Pair pair)
